@@ -36,12 +36,12 @@ Solver::Variable::Variable() {
 
 //Keeps the variable assignation order
 int Solver::defineOrder() {
-	int count = 0;
+	int count = 1;
 	for (int i = 0; i < numb_of_var; i++)
 		if (var[i].init_order != 0)
 			count++;
 
-	return count + 1;
+	return count;
 }
 
 
@@ -143,18 +143,13 @@ void Solver::read(ifstream &input) {
 
 		}
 
-		if (ch == '\n')
-			input.get();
+	if ((ch == '\n') || (ch == ' '))
+		input.get();
 
-		if (input.eof() && (line < numb_of_fact - 1))
-			formatError();
+	if ((ch == '%') && (line < numb_of_fact - 1))
+		formatError();
 
-		//Default
-		if ((ch != 'c') && (ch != key[0]) && !acceptable(ch)
-			&& !input.eof())
-			formatError();
-
-	} while (!input.eof());
+	} while (ch != '%');
 }
 
 
@@ -314,43 +309,60 @@ bool Solver::purefied() {
 
 //Branch variable choise
 void Solver::chooseVar() {
-	if (!allVariablesIsDefined()) {
-		int *count = new int[numb_of_var] ();
+if (!allVariablesIsDefined()) {
+		int *count_plus = new int[numb_of_var] ();
+		int *count_minus = new int[numb_of_var] ();
 
 		for (int i = 0; i < numb_of_fact; i++) {
 			int j = 0;
 			while (data[i][j] != 0) {
 				int ind = abs(data[i][j]) - 1;
 
-				if ((data[i][j] > 0) && (var[ind].value == -1)) {			
-					count[ind] += 1;
-				}
+				if ((data[i][j] > 0) && (var[ind].value == -1)) 		
+					count_plus[ind] += 1;
+
+				if ((data[i][j] < 0) && (var[ind].value == -1))
+					count_minus[ind] += 1;
 
 				j++;
 			}
 		}
 
-		int max, idx;
+		int max_plus, max_minus, id_plus, id_minus;
 
 		//First non-defined variable
 		for (int i = 0; i < numb_of_var; i++)
 			if (var[i].value == -1) {
-				max = count[i];
-				idx = i;
+				max_plus = count_plus[i];
+				max_minus = count_minus[i];
+				id_plus = i;
+				id_minus = i;
 				break;
 			}
 		
 
-		for (int i = 1; i < numb_of_var; i++)
-			if (count[i] > max) {
-				max = count[i];
-				idx = i;
+		for (int i = 1; i < numb_of_var; i++) {
+			if (count_plus[i] > max_plus) {
+				max_plus = count_plus[i];
+				id_plus = i;
 			}
 
-		var[idx].value = 1;
-		var[idx].init_order = defineOrder();
+			if (count_minus[i] > max_minus) {
+				max_minus = count_minus[i];
+				id_minus = i;
+			}
+		}
 
-		delete[] count;
+		if (max_minus > max_plus) {
+			var[id_minus].value = 0;
+			var[id_minus].init_order = defineOrder();
+		} else {
+			var[id_plus].value = 1;
+			var[id_plus].init_order = defineOrder();
+		}
+
+		delete[] count_plus;
+		delete[] count_minus;
 	}
 }
 
@@ -454,10 +466,10 @@ void Solver::solve() {
 					//find the last initialized variable which wasn't
 				if (var[idx].define_twice) {	
 					for (int i = numb_of_var - 1; i >= 0; i--) {
-						int ind = order[i];
+						int ind = order[i] - 1;
 
 						if (!var[ind].define_twice) {
-							idx = i;
+							idx = ind;
 							break;
 						}
 
@@ -493,7 +505,7 @@ void Solver::solve() {
 					simplify();
 				}
 
-				delete[] order;
+				delete[] order;	
 			}
 		}
 	}
